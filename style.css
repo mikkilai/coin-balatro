@@ -1,0 +1,179 @@
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+:root {
+  --bg: #1a3a32;
+  --bg-dark: #122b25;
+  --panel: #233634;
+  --panel-2: #2e4a45;
+  --blue: #3498db;
+  --red: #e74c3c;
+  --gold: #f1c40f;
+  --text: #ecf0f1;
+  --dim: #95a5a6;
+}
+
+html, body { height: 100%; }
+body {
+  background: radial-gradient(ellipse at center, var(--bg) 0%, var(--bg-dark) 100%);
+  color: var(--text);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+#game { display: flex; height: 100vh; gap: 14px; padding: 14px; }
+
+/* ----- Sidebar ----- */
+#sidebar { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.panel { background: var(--panel); border-radius: 10px; padding: 12px; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+
+.blind-name { font-size: 20px; font-weight: bold; color: var(--gold); }
+.blind-name.boss { color: #e056fd; }
+.boss-desc { font-size: 12px; color: #e056fd; margin-top: 4px; }
+.target-label, .reward-label, .label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; }
+.target { font-size: 28px; font-weight: bold; color: var(--red); }
+.reward-label span { color: var(--gold); }
+
+.big-score { font-size: 32px; font-weight: bold; }
+
+.pattern-name { font-size: 15px; font-weight: bold; min-height: 20px; color: var(--gold); }
+.chips-mult { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 22px; font-weight: bold; }
+.chips-box { background: var(--blue); border-radius: 6px; padding: 4px 12px; flex: 1; text-align: right; }
+.mult-box { background: var(--red); border-radius: 6px; padding: 4px 12px; flex: 1; }
+.x { color: var(--dim); }
+
+.stats-row { display: flex; gap: 10px; }
+.stat { flex: 1; background: var(--panel); border-radius: 10px; padding: 8px 12px; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+.stat-val { font-size: 22px; font-weight: bold; }
+.stat-val.blue { color: var(--blue); }
+.stat-val.red { color: var(--red); }
+.stat-val.gold { color: var(--gold); }
+
+/* ----- Table ----- */
+#table { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.row-label { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.dim { color: var(--dim); text-transform: none; }
+
+.charm-slots { display: flex; gap: 10px; }
+.charm {
+  width: 140px; min-height: 86px; background: var(--panel-2); border-radius: 10px; padding: 8px;
+  box-shadow: 0 4px 0 rgba(0,0,0,.3); flex-shrink: 0;
+}
+.charm.empty { background: transparent; border: 2px dashed rgba(255,255,255,.12); box-shadow: none; }
+.charm-name { font-weight: bold; font-size: 13px; color: var(--gold); margin-bottom: 4px; }
+.charm-desc { font-size: 11px; color: var(--text); line-height: 1.3; }
+
+#coins-area {
+  flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.18); border-radius: 16px; gap: 18px;
+}
+.coins { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; perspective: 600px; }
+
+.coin {
+  width: 92px; height: 92px; border-radius: 50%; cursor: pointer; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #d5d8dc, #7f8c8d 75%);
+  border: 4px solid #5d6d7e;
+  box-shadow: 0 6px 0 rgba(0,0,0,.35);
+  transition: transform .12s, box-shadow .12s;
+}
+.coin .coin-face { font-size: 34px; text-shadow: 0 2px 2px rgba(0,0,0,.3); }
+.coin .coin-label {
+  position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: var(--dim); white-space: nowrap;
+}
+.coin.resting { opacity: .85; }
+.coin.selected { transform: translateY(-10px); box-shadow: 0 16px 0 rgba(0,0,0,.35), 0 0 0 3px var(--gold); }
+.coin:hover { transform: translateY(-4px); }
+.coin.selected:hover { transform: translateY(-10px); }
+
+.coin.gold    { background: radial-gradient(circle at 35% 30%, #f9e79f, #b7950b 75%); border-color: #9a7d0a; }
+.coin.lucky   { background: radial-gradient(circle at 35% 30%, #abebc6, #1e8449 75%); border-color: #196f3d; }
+.coin.loaded  { background: radial-gradient(circle at 35% 30%, #aeb6bf, #2c3e50 75%); border-color: #1b2631; }
+.coin.mult    { background: radial-gradient(circle at 35% 30%, #f5b7b1, #c0392b 75%); border-color: #922b21; }
+.coin.serpent { background: radial-gradient(circle at 35% 30%, #d2b4de, #6c3483 75%); border-color: #512e5f; }
+
+.coin.heads .coin-face { color: #fdf6d8; }
+.coin.tails .coin-face { color: #1b2631; }
+.coin.edge { box-shadow: 0 0 18px 4px var(--gold), 0 6px 0 rgba(0,0,0,.35); }
+.coin.edge .coin-face { color: var(--gold); }
+
+@keyframes spin {
+  0%   { transform: rotateX(0) translateY(0); }
+  50%  { transform: rotateX(720deg) translateY(-40px); }
+  100% { transform: rotateX(1440deg) translateY(0); }
+}
+.coin.flipping { animation: spin .6s ease-in-out; pointer-events: none; }
+
+.hint { color: var(--dim); font-size: 14px; min-height: 18px; }
+
+.score-pop {
+  position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+  font-size: 22px; text-align: center; color: var(--gold); font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0,0,0,.6); pointer-events: none;
+  animation: rise 1.4s ease-out forwards;
+}
+@keyframes rise {
+  0% { opacity: 0; transform: translate(-50%, 16px); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -40px); }
+}
+
+/* ----- Buttons ----- */
+#actions { display: flex; gap: 12px; justify-content: center; padding-bottom: 4px; }
+.btn {
+  font-family: inherit; font-size: 17px; font-weight: bold; color: #fff;
+  border: none; border-radius: 10px; padding: 12px 26px; cursor: pointer;
+  box-shadow: 0 5px 0 rgba(0,0,0,.35); transition: transform .08s, box-shadow .08s;
+}
+.btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn-blue { background: var(--blue); }
+.btn-red { background: var(--red); }
+.btn-gold { background: #d4ac0d; }
+
+/* ----- Overlays ----- */
+.overlay {
+  position: fixed; inset: 0; background: rgba(10, 20, 18, .82); z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+}
+.hidden { display: none !important; }
+.overlay-box {
+  background: var(--panel); border-radius: 16px; padding: 26px; max-width: 640px; width: 92%;
+  box-shadow: 0 8px 0 rgba(0,0,0,.4); max-height: 90vh; overflow-y: auto;
+}
+.overlay-box.center { text-align: center; }
+.overlay-box h2 { color: var(--gold); margin-bottom: 14px; }
+.overlay-box p { margin-bottom: 16px; color: var(--text); }
+
+.logo { font-size: 52px; letter-spacing: 6px; color: var(--gold); text-shadow: 0 4px 0 rgba(0,0,0,.4); }
+.tag { color: var(--dim); margin: 6px 0 18px; }
+.howto { text-align: left; font-size: 14px; line-height: 1.45; margin-bottom: 20px; }
+.howto p { margin-bottom: 10px; }
+.howto b { color: var(--gold); }
+
+.shop-money { float: right; font-size: 16px; color: var(--gold); }
+.shop-section { margin-bottom: 16px; }
+.shop-items { display: flex; gap: 12px; }
+.shop-item {
+  flex: 1; background: var(--panel-2); border-radius: 10px; padding: 10px; cursor: pointer; position: relative;
+  min-height: 96px; box-shadow: 0 4px 0 rgba(0,0,0,.3); transition: transform .1s;
+}
+.shop-item:hover:not(.sold):not(.cant) { transform: translateY(-3px); }
+.shop-item.cant { opacity: .45; cursor: default; }
+.shop-item.sold {
+  display: flex; align-items: center; justify-content: center; color: var(--dim);
+  background: transparent; border: 2px dashed rgba(255,255,255,.12); box-shadow: none; cursor: default;
+}
+.price { position: absolute; top: 8px; right: 10px; color: var(--gold); font-weight: bold; }
+.shop-item .charm-name { padding-right: 30px; }
+.shop-actions { display: flex; justify-content: space-between; margin-top: 8px; }
+
+@media (max-width: 900px) {
+  #game { flex-direction: column; overflow-y: auto; }
+  body { overflow-y: auto; }
+  #sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; }
+  #sidebar .panel { flex: 1 1 45%; }
+  .charm-slots { overflow-x: auto; }
+}
