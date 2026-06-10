@@ -30,23 +30,51 @@ const CHARMS = [
   { id: "echo",     name: "Echo Charm",   cost: 6, desc: "+1 Mult for each toss already scored this round" },
   { id: "magnet",   name: "Magnet",       cost: 5, desc: "Rerolled coins get +10 Chips this toss" },
   { id: "fortune",  name: "Fortune Cat",  cost: 7, desc: "All coins get +5% Heads chance" },
+  { id: "feather",  name: "Featherweight", cost: 6, desc: "+40 Chips if your purse holds 4 or fewer coins" },
+  { id: "hoarder",  name: "Dragon's Eye", cost: 5, desc: "+1 Chip per $ you hold (max +20)" },
+  { id: "gambler",  name: "Loose Thumb",  cost: 6, desc: "25% chance a Reroll is free" },
+  { id: "overkill", name: "Last Hurrah",  cost: 7, desc: "×2 Mult on the final Flip of a round" },
+  { id: "streak",   name: "Hot Streak",   cost: 5, desc: "+25 Chips if 3+ Heads land in a row" },
+  { id: "alchemy",  name: "Alchemist",    cost: 5, desc: "Edge coins give +100 Chips instead of +50" },
+  { id: "zigzag",   name: "Lightning Rod", cost: 6, desc: "×2 Mult on Zigzag patterns" },
+  { id: "piggy",    name: "Piggy Bank",   cost: 5, desc: "Interest cap raised from $5 to $10" },
 ];
 
-// Pattern table: f(headsEq, tailsEq, n) using edge-inclusive counts.
+// Patterns: base values plus per-level upgrade increments (Omens level them up).
+const PATTERNS = {
+  "Full Crown":      { chips: 60, mult: 8, upChips: 25, upMult: 3 },
+  "Serpent Hoard":   { chips: 50, mult: 6, upChips: 20, upMult: 2 },
+  "Zigzag":          { chips: 40, mult: 6, upChips: 20, upMult: 2 },
+  "Near Crown":      { chips: 30, mult: 4, upChips: 15, upMult: 2 },
+  "Near Hoard":      { chips: 25, mult: 4, upChips: 12, upMult: 2 },
+  "Perfect Balance": { chips: 25, mult: 3, upChips: 15, upMult: 1 },
+  "Heads Lean":      { chips: 15, mult: 2, upChips: 10, upMult: 1 },
+  "Tails Lean":      { chips: 10, mult: 2, upChips: 8,  upMult: 1 },
+};
+
+// Returns the pattern name for edge-inclusive heads/tails counts.
 function evalPattern(results) {
   const n = results.length;
   const h = results.filter(r => r === "H" || r === "E").length;
   const t = results.filter(r => r === "T" || r === "E").length;
   const noEdge = results.every(r => r !== "E");
   const alternating = n >= 4 && noEdge && results.every((r, i) => i === 0 || r !== results[i - 1]);
-  if (h === n) return { name: "Full Crown",    chips: 60, mult: 8 };
-  if (t === n) return { name: "Serpent Hoard", chips: 50, mult: 6 };
-  if (alternating)        return { name: "Zigzag",        chips: 40, mult: 6 };
-  if (h === n - 1 && t <= 1) return { name: "Near Crown", chips: 30, mult: 4 };
-  if (t === n - 1 && h <= 1) return { name: "Near Hoard", chips: 25, mult: 4 };
-  if (h === t)            return { name: "Perfect Balance", chips: 25, mult: 3 };
-  if (h > t)              return { name: "Heads Lean",    chips: 15, mult: 2 };
-  return                         { name: "Tails Lean",    chips: 10, mult: 2 };
+  if (h === n) return "Full Crown";
+  if (t === n) return "Serpent Hoard";
+  if (alternating) return "Zigzag";
+  if (h === n - 1 && t <= 1) return "Near Crown";
+  if (t === n - 1 && h <= 1) return "Near Hoard";
+  if (h === t) return "Perfect Balance";
+  if (h > t) return "Heads Lean";
+  return "Tails Lean";
+}
+
+function patternLevel(name) { return S.patternLevels[name] || 1; }
+
+function patternValues(name) {
+  const p = PATTERNS[name];
+  const lv = patternLevel(name);
+  return { chips: p.chips + (lv - 1) * p.upChips, mult: p.mult + (lv - 1) * p.upMult };
 }
 
 const ANTE_BASE = [100, 300, 800, 2000, 5000, 11000, 20000, 35000];
@@ -63,6 +91,8 @@ const BOSSES = [
   { id: "miser",   name: "The Miser",   desc: "Base pattern Chips are halved" },
 ];
 
+const MIN_COINS = 3;
+
 // ---------- State ----------
 
 let S = null;
@@ -72,12 +102,15 @@ function newRun() {
     ante: 0, blind: 0, money: 4,
     coins: Array.from({ length: 5 }, () => ({ type: "standard" })),
     charms: [],
+    patternLevels: {},
     roundScore: 0, flipsLeft: 0, rerollsLeft: 0, tossesScored: 0,
     results: null,        // array of "H"|"T"|"E" after a flip, null between tosses
     rerolledIdx: new Set(),
     selected: new Set(),
     boss: null,
     shopStock: null,
+    meltUsed: false,
+    meltMode: false,
     busy: false,
   };
   startRound();
@@ -120,18 +153,20 @@ function tossCoin(coin) {
 // ---------- Scoring ----------
 
 function computeScore(results) {
-  const pat = evalPattern(results);
+  const patName = evalPattern(results);
+  const pat = patternValues(patName);
   let chips = pat.chips;
-  if (S.boss && S.boss.id === "miser") chips = Math.floor(pat.chips / 2);
+  if (S.boss && S.boss.id === "miser") chips = Math.floor(chips / 2);
   let mult = pat.mult;
   const xmults = [];
   const censor = S.boss && S.boss.id === "censor";
+  const edgeBonus = hasCharm("alchemy") ? 100 : 50;
 
   results.forEach((r, i) => {
     const ct = COIN_TYPES[S.coins[i].type];
     if (r === "H" || r === "E") { chips += censor && r === "E" ? 0 : ct.headsChips; mult += ct.headsMult; }
     if (r === "T" || r === "E") { if (!censor) chips += ct.tailsChips; mult += ct.tailsMult; }
-    if (r === "E") chips += 50;
+    if (r === "E") chips += edgeBonus;
     if (S.rerolledIdx.has(i) && hasCharm("magnet")) chips += 10;
   });
 
@@ -141,12 +176,21 @@ function computeScore(results) {
   if (hasCharm("hunter")) chips += 15 * h;
   if (hasCharm("tailwind")) mult += 2 * t;
   if (hasCharm("echo")) mult += S.tossesScored;
+  if (hasCharm("feather") && S.coins.length <= 4) chips += 40;
+  if (hasCharm("hoarder")) chips += Math.min(20, S.money);
+  if (hasCharm("streak")) {
+    let run = 0, best = 0;
+    for (const r of results) { run = (r === "H" || r === "E") ? run + 1 : 0; best = Math.max(best, run); }
+    if (best >= 3) chips += 25;
+  }
   if (hasCharm("crown") && h === results.length) xmults.push(3);
   if (hasCharm("twin") && h === t) xmults.push(2);
+  if (hasCharm("zigzag") && patName === "Zigzag") xmults.push(2);
+  if (hasCharm("overkill") && S.flipsLeft === 0) xmults.push(2);
 
   let total = chips * mult;
   for (const x of xmults) { mult *= x; total = chips * mult; }
-  return { pattern: pat.name, chips, mult, total: Math.floor(total) };
+  return { pattern: patName, level: patternLevel(patName), chips, mult, total: Math.floor(total) };
 }
 
 // ---------- Actions ----------
@@ -166,7 +210,8 @@ function doFlip() {
 function doReroll() {
   if (S.busy || !S.results || S.rerollsLeft <= 0 || S.selected.size === 0) return;
   S.busy = true;
-  S.rerollsLeft -= 1;
+  const free = hasCharm("gambler") && Math.random() < 0.25;
+  if (!free) S.rerollsLeft -= 1;
   const idx = [...S.selected];
   idx.forEach(i => S.rerolledIdx.add(i));
   const fresh = idx.map(i => tossCoin(S.coins[i]));
@@ -175,6 +220,7 @@ function doReroll() {
     S.selected.clear();
     S.busy = false;
     render();
+    if (free) el("flip-hint").textContent = "Loose Thumb! That reroll was free.";
   });
 }
 
@@ -197,9 +243,11 @@ function doScore() {
   render();
 }
 
+function interestCap() { return hasCharm("piggy") ? 10 : 5; }
+
 function winBlind() {
   const b = blindInfo();
-  let cash = b.reward + S.flipsLeft + Math.min(5, Math.floor(S.money / 5));
+  let cash = b.reward + S.flipsLeft + Math.min(interestCap(), Math.floor(S.money / 5));
   if (hasCharm("banker")) cash += 3;
   S.money += cash;
   if (S.blind === 2 && S.ante === 7) { endRun(true); return; }
@@ -229,16 +277,21 @@ function pick(arr, n) {
   return out;
 }
 
+function omenCost(name) { return 4 + patternLevel(name); }
+
 function rollShopStock() {
   const owned = new Set(S.charms.map(c => c.id));
   S.shopStock = {
     charms: pick(CHARMS.filter(c => !owned.has(c.id)), 2),
     coins: pick(Object.keys(COIN_TYPES).filter(k => k !== "standard"), 2),
+    omens: pick(Object.keys(PATTERNS), 2),
   };
 }
 
 function openShop(cash) {
   rollShopStock();
+  S.meltUsed = false;
+  S.meltMode = false;
   el("shop").classList.remove("hidden");
   renderShop(`Blind beaten! +$${cash}`);
 }
@@ -258,6 +311,24 @@ function buyCoin(i) {
   S.money -= COIN_TYPES[key].cost;
   S.coins.push({ type: key });
   S.shopStock.coins[i] = null;
+  renderShop(); render();
+}
+
+function buyOmen(i) {
+  const name = S.shopStock.omens[i];
+  if (!name || S.money < omenCost(name)) return;
+  S.money -= omenCost(name);
+  S.patternLevels[name] = patternLevel(name) + 1;
+  S.shopStock.omens[i] = null;
+  renderShop(); render();
+}
+
+function meltCoin(i) {
+  if (S.meltUsed || S.coins.length <= MIN_COINS) return;
+  S.coins.splice(i, 1);
+  S.money += 1;
+  S.meltUsed = true;
+  S.meltMode = false;
   renderShop(); render();
 }
 
@@ -322,7 +393,7 @@ function render() {
   // Calc preview
   if (S.results) {
     const sc = computeScore(S.results);
-    el("pattern-name").textContent = sc.pattern;
+    el("pattern-name").textContent = sc.pattern + (sc.level > 1 ? ` lv.${sc.level}` : "");
     el("calc-chips").textContent = fmt(sc.chips);
     el("calc-mult").textContent = fmt(sc.mult);
   } else {
@@ -356,6 +427,7 @@ function renderShop(banner) {
     }
     sc.appendChild(d);
   });
+
   const sn = el("shop-coins");
   sn.innerHTML = "";
   S.shopStock.coins.forEach((k, i) => {
@@ -370,6 +442,86 @@ function renderShop(banner) {
     }
     sn.appendChild(d);
   });
+
+  const so = el("shop-omens");
+  so.innerHTML = "";
+  S.shopStock.omens.forEach((name, i) => {
+    const d = document.createElement("div");
+    if (!name) { d.className = "shop-item sold"; d.textContent = "SOLD"; }
+    else {
+      const p = PATTERNS[name];
+      const lv = patternLevel(name);
+      const cost = omenCost(name);
+      const afford = S.money >= cost;
+      d.className = "shop-item omen-item" + (afford ? "" : " cant");
+      d.innerHTML = `<div class="charm-name">${name} lv.${lv} → lv.${lv + 1}</div>` +
+        `<div class="charm-desc">+${p.upChips} base Chips, +${p.upMult} base Mult</div><div class="price">$${cost}</div>`;
+      d.onclick = () => buyOmen(i);
+    }
+    so.appendChild(d);
+  });
+
+  // Melt service
+  const sv = el("shop-melt");
+  sv.innerHTML = "";
+  const canMelt = !S.meltUsed && S.coins.length > MIN_COINS;
+  if (!S.meltMode) {
+    const d = document.createElement("div");
+    if (S.meltUsed) { d.className = "shop-item sold"; d.textContent = "CRUCIBLE COOLING"; }
+    else {
+      d.className = "shop-item melt-item" + (canMelt ? "" : " cant");
+      d.innerHTML = `<div class="charm-name">Melt a Coin</div><div class="charm-desc">Remove a coin from your purse for +$1. ` +
+        `Fewer coins = more consistent patterns. (min ${MIN_COINS} coins, once per shop)</div><div class="price">+$1</div>`;
+      if (canMelt) d.onclick = () => { S.meltMode = true; renderShop(); };
+    }
+    sv.appendChild(d);
+  } else {
+    S.coins.forEach((coin, i) => {
+      const ct = COIN_TYPES[coin.type];
+      const d = document.createElement("div");
+      d.className = `shop-item coin-item ${coin.type} melt-pick`;
+      d.innerHTML = `<div class="charm-name">🔥 ${ct.name}</div><div class="charm-desc">${ct.desc}</div>`;
+      d.onclick = () => meltCoin(i);
+      sv.appendChild(d);
+    });
+    const cancel = document.createElement("div");
+    cancel.className = "shop-item sold";
+    cancel.textContent = "CANCEL";
+    cancel.style.cursor = "pointer";
+    cancel.onclick = () => { S.meltMode = false; renderShop(); };
+    sv.appendChild(cancel);
+  }
+}
+
+// ---------- Tutorial ----------
+
+function renderTutorialPatterns() {
+  const tbody = el("tut-patterns");
+  tbody.innerHTML = "";
+  for (const [name, p] of Object.entries(PATTERNS)) {
+    const lv = S ? patternLevel(name) : 1;
+    const v = S ? patternValues(name) : { chips: p.chips, mult: p.mult };
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${name}${lv > 1 ? ` <span class="lv">lv.${lv}</span>` : ""}</td>` +
+      `<td>${TUT_PATTERN_HINTS[name]}</td><td class="num">${v.chips} × ${v.mult}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+const TUT_PATTERN_HINTS = {
+  "Full Crown": "Every coin shows Heads",
+  "Serpent Hoard": "Every coin shows Tails",
+  "Zigzag": "Heads and Tails perfectly alternate (4+ coins)",
+  "Near Crown": "All Heads except one",
+  "Near Hoard": "All Tails except one",
+  "Perfect Balance": "Heads and Tails are tied",
+  "Heads Lean": "More Heads than Tails",
+  "Tails Lean": "More Tails than Heads",
+};
+
+function openTutorial() {
+  renderTutorialPatterns();
+  el("tutorial").classList.remove("hidden");
 }
 
 // ---------- Animation ----------
@@ -406,10 +558,16 @@ el("btn-shop-reroll").onclick = () => {
   if (S.money < 2) return;
   S.money -= 2;
   rollShopStock();
+  S.meltMode = false;
   renderShop();
 };
+el("btn-help").onclick = openTutorial;
+el("btn-tutorial-close").onclick = () => el("tutorial").classList.add("hidden");
+el("tutorial").onclick = e => { if (e.target === el("tutorial")) el("tutorial").classList.add("hidden"); };
 
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { el("tutorial").classList.add("hidden"); return; }
+  if (e.key === "?") { openTutorial(); return; }
   if (!S || document.querySelector(".overlay:not(.hidden)")) return;
   if (e.key === "f") doFlip();
   if (e.key === "r") doReroll();
