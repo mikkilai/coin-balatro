@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flipjack — Balatro, but coin flips</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game">
+  <aside id="sidebar">
+    <div class="panel" id="blind-panel">
+      <div id="blind-name" class="blind-name">Small Blind</div>
+      <div id="boss-desc" class="boss-desc hidden"></div>
+      <div class="target-label">Score at least</div>
+      <div id="blind-target" class="target">100</div>
+      <div class="reward-label">Reward: <span id="blind-reward">$3</span></div>
+    </div>
+    <div class="panel score-panel">
+      <div class="label">Round Score</div>
+      <div id="round-score" class="big-score">0</div>
+    </div>
+    <div class="panel calc-panel">
+      <div id="pattern-name" class="pattern-name">—</div>
+      <div class="chips-mult">
+        <div class="chips-box"><span id="calc-chips">0</span></div>
+        <span class="x">×</span>
+        <div class="mult-box"><span id="calc-mult">0</span></div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="label">Flips</div><div id="flips-left" class="stat-val blue">4</div></div>
+      <div class="stat"><div class="label">Rerolls</div><div id="rerolls-left" class="stat-val red">3</div></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="label">Money</div><div id="money" class="stat-val gold">$4</div></div>
+      <div class="stat"><div class="label">Ante</div><div id="ante" class="stat-val">1/8</div></div>
+    </div>
+  </aside>
+
+  <main id="table">
+    <div id="charms-row">
+      <div class="row-label">Charms <span id="charm-count">0/5</span></div>
+      <div id="charms" class="charm-slots"></div>
+    </div>
+
+    <div id="coins-area">
+      <div id="coins" class="coins"></div>
+      <div id="flip-hint" class="hint">Flip your coins to begin</div>
+    </div>
+
+    <div id="actions">
+      <button id="btn-flip" class="btn btn-blue">Flip Coins</button>
+      <button id="btn-reroll" class="btn btn-red" disabled>Reroll Selected</button>
+      <button id="btn-score" class="btn btn-gold" disabled>Score</button>
+    </div>
+  </main>
+</div>
+
+<div id="shop" class="overlay hidden">
+  <div class="overlay-box shop-box">
+    <h2>The Mint <span class="shop-money" id="shop-money">$0</span></h2>
+    <div class="shop-section">
+      <div class="row-label">Charms</div>
+      <div id="shop-charms" class="shop-items"></div>
+    </div>
+    <div class="shop-section">
+      <div class="row-label">Coins <span class="dim">(added to your purse)</span></div>
+      <div id="shop-coins" class="shop-items"></div>
+    </div>
+    <div class="shop-actions">
+      <button id="btn-shop-reroll" class="btn btn-red">Reroll Shop ($2)</button>
+      <button id="btn-next-round" class="btn btn-gold">Next Blind →</button>
+    </div>
+  </div>
+</div>
+
+<div id="gameover" class="overlay hidden">
+  <div class="overlay-box center">
+    <h2 id="end-title">Game Over</h2>
+    <p id="end-detail"></p>
+    <button id="btn-restart" class="btn btn-gold">New Run</button>
+  </div>
+</div>
+
+<div id="intro" class="overlay">
+  <div class="overlay-box center">
+    <h1 class="logo">FLIPJACK</h1>
+    <p class="tag">Balatro, but coin flips.</p>
+    <div class="howto">
+      <p><b>Flip</b> your purse of coins. The heads/tails pattern sets base Chips × Mult, and every coin adds Chips.</p>
+      <p><b>Reroll</b> selected coins to chase better patterns, then <b>Score</b> the toss.</p>
+      <p>Beat each Blind's score target before you run out of Flips. Spend winnings on <b>Charms</b> and new coins. Survive 8 Antes.</p>
+    </div>
+    <button id="btn-start" class="btn btn-gold">Start Run</button>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
