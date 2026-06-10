@@ -43,6 +43,8 @@ const CHARMS = [
   { id: "piggy",    name: "Piggy Bank",   cost: 5, desc: "Interest cap raised from $5 to $10" },
 ];
 
+const CHARM_POOL_SIZE = 14; // charms available per run, for variety
+
 // Patterns: base values plus per-level upgrade increments (Omens level them up).
 const PATTERNS = {
   "Full Crown":      { chips: 60, mult: 8, upChips: 25, upMult: 3 },
@@ -54,6 +56,8 @@ const PATTERNS = {
   "Heads Lean":      { chips: 15, mult: 2, upChips: 10, upMult: 1 },
   "Tails Lean":      { chips: 10, mult: 2, upChips: 8,  upMult: 1 },
 };
+
+const LEAN_PATTERNS = new Set(["Heads Lean", "Tails Lean", "Perfect Balance"]);
 
 const ANTE_BASE = [100, 300, 800, 2000, 5000, 11000, 20000, 35000];
 const BLINDS = [
@@ -67,6 +71,21 @@ const BOSSES = [
   { id: "gravity", name: "The Gravity", desc: "All coins get -20% Heads chance" },
   { id: "hurry",   name: "The Hurry",   desc: "-1 Flip this round" },
   { id: "miser",   name: "The Miser",   desc: "Base pattern Chips are halved" },
+  { id: "anchor",  name: "The Anchor",  desc: "Your first coin is locked and can't be rerolled" },
+  { id: "purist",  name: "The Purist",  desc: "Lean and Balance patterns score 0 base Chips" },
+  { id: "cramp",   name: "The Cramp",   desc: "-1 Reroll this round" },
+  { id: "leveler", name: "The Leveler", desc: "Pattern levels are ignored this round" },
+];
+
+const POUCHES = [
+  { id: "penny",    name: "Penny Pouch",     desc: "The classic. 5 Pennies and $4.",
+    coins: ["standard", "standard", "standard", "standard", "standard"], money: 4 },
+  { id: "clover",   name: "Clover Pouch",    desc: "4 Lucky Coins and $3. Luck is all you carry.",
+    coins: ["lucky", "lucky", "lucky", "lucky"], money: 3 },
+  { id: "merchant", name: "Merchant's Pouch", desc: "6 Pennies and $10, but -1 Reroll each round.",
+    coins: ["standard", "standard", "standard", "standard", "standard", "standard"], money: 10, rerollMod: -1 },
+  { id: "serpent",  name: "Serpent Pouch",   desc: "3 Serpent Coins, a Penny and $5. Tails pay.",
+    coins: ["serpent", "serpent", "serpent", "standard"], money: 5 },
 ];
 
 const MIN_COINS = 3;
@@ -80,19 +99,34 @@ let S = null;
 
 function getState() { return S; }
 
-function newRun() {
+function shuffled(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function newRun(pouchId) {
+  const pouch = POUCHES.find(p => p.id === pouchId) || POUCHES[0];
   S = {
-    ante: 0, blind: 0, money: 4,
-    coins: Array.from({ length: 5 }, () => ({ type: "standard" })),
+    ante: 0, blind: 0, money: pouch.money,
+    pouch: { id: pouch.id, flipMod: pouch.flipMod || 0, rerollMod: pouch.rerollMod || 0 },
+    coins: pouch.coins.map(type => ({ type })),
     charms: [],
+    charmPool: shuffled(CHARMS.map(c => c.id)).slice(0, CHARM_POOL_SIZE),
+    bossOrder: shuffled(BOSSES.map(b => b.id)), // one boss per ante, no repeats
     patternLevels: {},
     roundScore: 0, flipsLeft: 0, rerollsLeft: 0, tossesScored: 0,
+    bestToss: 0,
     results: null,        // array of "H"|"T"|"E" after a flip, null between tosses
     pendingToss: false,   // a flip/reroll is awaiting its commit
     rerolledIdx: new Set(),
     selected: new Set(),
     boss: null,
     shopStock: null,
+    inShop: false,
     meltUsed: false,
     meltMode: false,
   };
@@ -107,17 +141,18 @@ function blindInfo() {
   return { ...b, target: Math.floor(ANTE_BASE[S.ante] * b.mul) };
 }
 
+function bossIs(id) { return !!(S.boss && S.boss.id === id); }
+
 function startRound() {
   S.roundScore = 0;
   S.tossesScored = 0;
-  S.flipsLeft = 4 + (hasCharm("stamina") ? 1 : 0);
-  S.rerollsLeft = 3 + (hasCharm("patience") ? 1 : 0);
+  S.boss = S.blind === 2 ? BOSSES.find(b => b.id === S.bossOrder[S.ante]) : null;
+  S.flipsLeft = Math.max(1, 4 + (hasCharm("stamina") ? 1 : 0) + S.pouch.flipMod - (bossIs("hurry") ? 1 : 0));
+  S.rerollsLeft = Math.max(0, 3 + (hasCharm("patience") ? 1 : 0) + S.pouch.rerollMod - (bossIs("cramp") ? 1 : 0));
   S.results = null;
   S.pendingToss = false;
   S.selected.clear();
   S.rerolledIdx.clear();
-  S.boss = S.blind === 2 ? BOSSES[(S.ante * 7 + 3) % BOSSES.length] : null;
-  if (S.boss && S.boss.id === "hurry") S.flipsLeft -= 1;
 }
 
 // ---------- Coin physics ----------
@@ -125,7 +160,7 @@ function startRound() {
 function headsProbFor(coin) {
   let p = COIN_TYPES[coin.type].headsProb;
   if (hasCharm("fortune")) p += 0.05;
-  if (S.boss && S.boss.id === "gravity") p -= 0.20;
+  if (bossIs("gravity")) p -= 0.20;
   return Math.min(0.95, Math.max(0.05, p));
 }
 
@@ -133,6 +168,9 @@ function tossCoin(coin) {
   if (hasCharm("edge") && Math.random() < 1 / 12) return "E";
   return Math.random() < headsProbFor(coin) ? "H" : "T";
 }
+
+// Coins that can't be selected for a reroll this round.
+function isCoinLocked(i) { return bossIs("anchor") && i === 0; }
 
 // ---------- Patterns & scoring ----------
 
@@ -163,45 +201,61 @@ function patternValues(name) {
 
 function interestCap() { return hasCharm("piggy") ? 10 : 5; }
 
+// Computes the score of a toss along with a step-by-step breakdown the UI
+// animates: [{kind:"pattern"|"coin"|"charm"|"xmult", ...}].
 function computeScore(results) {
   const patName = evalPattern(results);
-  const pat = patternValues(patName);
-  let chips = pat.chips;
-  if (S.boss && S.boss.id === "miser") chips = Math.floor(chips / 2);
-  let mult = pat.mult;
-  const xmults = [];
-  const censor = S.boss && S.boss.id === "censor";
+  const p = PATTERNS[patName];
+  const lvl = bossIs("leveler") ? 1 : patternLevel(patName);
+  let chips = p.chips + (lvl - 1) * p.upChips;
+  let mult = p.mult + (lvl - 1) * p.upMult;
+  if (bossIs("miser")) chips = Math.floor(chips / 2);
+  if (bossIs("purist") && LEAN_PATTERNS.has(patName)) chips = 0;
+  const steps = [{ kind: "pattern", label: patName + (lvl > 1 ? ` lv.${lvl}` : ""), chips, mult }];
+
+  const censor = bossIs("censor");
   const edgeBonus = hasCharm("alchemy") ? 100 : 50;
 
   results.forEach((r, i) => {
     const ct = COIN_TYPES[S.coins[i].type];
-    if (r === "H" || r === "E") { chips += ct.headsChips; mult += ct.headsMult; }
-    if (r === "T" || r === "E") { if (!censor) chips += ct.tailsChips; mult += ct.tailsMult; }
-    if (r === "E") chips += edgeBonus;
-    if (S.rerolledIdx.has(i) && hasCharm("magnet")) chips += 10;
+    let dc = 0, dm = 0;
+    if (r === "H" || r === "E") { dc += ct.headsChips; dm += ct.headsMult; }
+    if (r === "T" || r === "E") { if (!censor) dc += ct.tailsChips; dm += ct.tailsMult; }
+    if (r === "E") dc += edgeBonus;
+    if (S.rerolledIdx.has(i) && hasCharm("magnet")) dc += 10;
+    chips += dc; mult += dm;
+    steps.push({ kind: "coin", i, chips: dc, mult: dm });
   });
+
+  function addCharm(id, dc, dm) {
+    chips += dc; mult += dm;
+    steps.push({ kind: "charm", id, chips: dc, mult: dm });
+  }
 
   const h = results.filter(r => r === "H" || r === "E").length;
   const t = results.filter(r => r === "T" || r === "E").length;
-  if (hasCharm("lint")) mult += 4;
-  if (hasCharm("hunter")) chips += 15 * h;
-  if (hasCharm("tailwind")) mult += 2 * t;
-  if (hasCharm("echo")) mult += S.tossesScored;
-  if (hasCharm("feather") && S.coins.length <= 4) chips += 40;
-  if (hasCharm("hoarder")) chips += Math.min(20, S.money);
+  if (hasCharm("lint")) addCharm("lint", 0, 4);
+  if (hasCharm("hunter") && h > 0) addCharm("hunter", 15 * h, 0);
+  if (hasCharm("tailwind") && t > 0) addCharm("tailwind", 0, 2 * t);
+  if (hasCharm("echo") && S.tossesScored > 0) addCharm("echo", 0, S.tossesScored);
+  if (hasCharm("feather") && S.coins.length <= 4) addCharm("feather", 40, 0);
+  if (hasCharm("hoarder") && S.money > 0) addCharm("hoarder", Math.min(20, S.money), 0);
   if (hasCharm("streak")) {
     let run = 0, best = 0;
     for (const r of results) { run = (r === "H" || r === "E") ? run + 1 : 0; best = Math.max(best, run); }
-    if (best >= 3) chips += 25;
+    if (best >= 3) addCharm("streak", 25, 0);
   }
-  if (hasCharm("crown") && h === results.length) xmults.push(3);
-  if (hasCharm("twin") && h === t) xmults.push(2);
-  if (hasCharm("zigzag") && patName === "Zigzag") xmults.push(2);
-  if (hasCharm("overkill") && S.flipsLeft === 0) xmults.push(2);
 
-  let total = chips * mult;
-  for (const x of xmults) { mult *= x; total = chips * mult; }
-  return { pattern: patName, level: patternLevel(patName), chips, mult, total: Math.floor(total) };
+  function xmult(id, x) {
+    mult *= x;
+    steps.push({ kind: "xmult", id, x });
+  }
+  if (hasCharm("crown") && h === results.length) xmult("crown", 3);
+  if (hasCharm("twin") && h === t) xmult("twin", 2);
+  if (hasCharm("zigzag") && patName === "Zigzag") xmult("zigzag", 2);
+  if (hasCharm("overkill") && S.flipsLeft === 0) xmult("overkill", 2);
+
+  return { pattern: patName, level: lvl, chips, mult, total: Math.floor(chips * mult), steps };
 }
 
 // ---------- Round transitions ----------
@@ -224,13 +278,16 @@ function commitFlip(results) {
   S.pendingToss = false;
 }
 
-function canReroll() { return !!(S && S.results && !S.pendingToss && S.rerollsLeft > 0 && S.selected.size > 0); }
+function canReroll() {
+  return !!(S && S.results && !S.pendingToss && S.rerollsLeft > 0
+    && [...S.selected].some(i => !isCoinLocked(i)));
+}
 
 function reroll() {
   if (!canReroll()) return null;
   const free = hasCharm("gambler") && Math.random() < 0.25;
   if (!free) S.rerollsLeft -= 1;
-  const indices = [...S.selected];
+  const indices = [...S.selected].filter(i => !isCoinLocked(i));
   indices.forEach(i => S.rerolledIdx.add(i));
   S.pendingToss = true;
   return { indices, results: indices.map(i => tossCoin(S.coins[i])), free };
@@ -243,11 +300,13 @@ function commitReroll(indices, results) {
 }
 
 // Scores the current toss. Returns { sc, outcome: "win"|"lose"|"continue" }.
-function scoreToss() {
+// Accepts a precomputed score so the UI can animate the exact breakdown.
+function scoreToss(sc) {
   if (!S.results) return null;
-  const sc = computeScore(S.results);
+  sc = sc || computeScore(S.results);
   S.roundScore += sc.total;
   S.tossesScored += 1;
+  S.bestToss = Math.max(S.bestToss, sc.total);
   S.results = null;
   S.selected.clear();
   S.rerolledIdx.clear();
@@ -268,6 +327,7 @@ function winBlind() {
 function advanceBlind() {
   S.blind += 1;
   if (S.blind > 2) { S.blind = 0; S.ante += 1; }
+  S.inShop = false;
   startRound();
 }
 
@@ -284,8 +344,9 @@ function omenCost(name) { return 4 + patternLevel(name); }
 
 function rollShopStock() {
   const owned = new Set(S.charms.map(c => c.id));
+  const pool = new Set(S.charmPool);
   S.shopStock = {
-    charms: pick(CHARMS.filter(c => !owned.has(c.id)), 2),
+    charms: pick(CHARMS.filter(c => pool.has(c.id) && !owned.has(c.id)), 2),
     coins: pick(Object.keys(COIN_TYPES).filter(k => k !== "standard"), 2),
     omens: pick(Object.keys(PATTERNS), 2),
   };
@@ -294,6 +355,7 @@ function rollShopStock() {
 // Fresh shop visit: new stock and the Crucible relights.
 function enterShop() {
   rollShopStock();
+  S.inShop = true;
   S.meltUsed = false;
   S.meltMode = false;
 }
@@ -344,17 +406,61 @@ function meltCoin(i) {
   return true;
 }
 
+// ---------- Save / load ----------
+
+const SAVE_VERSION = 1;
+
+function exportState() {
+  if (!S || S.pendingToss) return null;
+  return JSON.stringify({
+    v: SAVE_VERSION,
+    ...S,
+    selected: [...S.selected],
+    rerolledIdx: [...S.rerolledIdx],
+    charms: S.charms.map(c => c.id),
+    boss: S.boss ? S.boss.id : null,
+    shopStock: S.shopStock ? {
+      charms: S.shopStock.charms.map(c => (c ? c.id : null)),
+      coins: [...S.shopStock.coins],
+      omens: [...S.shopStock.omens],
+    } : null,
+  });
+}
+
+function importState(json) {
+  let d;
+  try { d = JSON.parse(json); } catch { return null; }
+  if (!d || d.v !== SAVE_VERSION || !Array.isArray(d.coins) || !d.pouch) return null;
+  const charmById = id => CHARMS.find(c => c.id === id);
+  S = {
+    ...d,
+    selected: new Set(d.selected),
+    rerolledIdx: new Set(d.rerolledIdx),
+    charms: d.charms.map(charmById).filter(Boolean),
+    boss: d.boss ? BOSSES.find(b => b.id === d.boss) || null : null,
+    shopStock: d.shopStock ? {
+      charms: d.shopStock.charms.map(id => (id ? charmById(id) || null : null)),
+      coins: [...d.shopStock.coins],
+      omens: [...d.shopStock.omens],
+    } : null,
+    pendingToss: false,
+  };
+  delete S.v;
+  return S;
+}
+
 // ---------- Node export (browser loads this as a plain script) ----------
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    COIN_TYPES, CHARMS, PATTERNS, ANTE_BASE, BLINDS, BOSSES,
-    MIN_COINS, MAX_COINS, MAX_CHARMS, SHOP_REROLL_COST,
+    COIN_TYPES, CHARMS, PATTERNS, ANTE_BASE, BLINDS, BOSSES, POUCHES,
+    MIN_COINS, MAX_COINS, MAX_CHARMS, SHOP_REROLL_COST, CHARM_POOL_SIZE,
     getState, newRun, startRound, hasCharm, blindInfo, headsProbFor, tossCoin,
-    evalPattern, patternLevel, patternValues, interestCap, computeScore,
+    isCoinLocked, evalPattern, patternLevel, patternValues, interestCap, computeScore,
     canFlip, flip, commitFlip, canReroll, reroll, commitReroll, scoreToss,
     winBlind, advanceBlind,
     omenCost, rollShopStock, enterShop, rerollShop,
     buyCharm, buyCoin, buyOmen, canMelt, meltCoin,
+    exportState, importState,
   };
 }
