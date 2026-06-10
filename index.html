@@ -68,10 +68,41 @@
       <div class="row-label">Coins <span class="dim">(added to your purse)</span></div>
       <div id="shop-coins" class="shop-items"></div>
     </div>
+    <div class="shop-section">
+      <div class="row-label">Omens <span class="dim">(permanently level up a pattern)</span></div>
+      <div id="shop-omens" class="shop-items"></div>
+    </div>
+    <div class="shop-section">
+      <div class="row-label">The Crucible</div>
+      <div id="shop-melt" class="shop-items"></div>
+    </div>
     <div class="shop-actions">
       <button id="btn-shop-reroll" class="btn btn-red">Reroll Shop ($2)</button>
       <button id="btn-next-round" class="btn btn-gold">Next Blind →</button>
     </div>
+  </div>
+</div>
+
+<button id="btn-help" title="How to play (?)">?</button>
+
+<div id="tutorial" class="overlay hidden">
+  <div class="overlay-box tutorial-box">
+    <h2>How to Play</h2>
+    <div class="howto">
+      <p><b>Goal:</b> beat the score target of every Blind across 8 Antes. Each Ante has a Small Blind, Big Blind, and a rule-twisting <b>Boss Blind</b>.</p>
+      <p><b>Flip</b> (hotkey F) tosses every coin in your purse — you get 4 Flips per round. After a flip, click coins to select them and <b>Reroll</b> (R) just those — 3 Rerolls per round. When you like the result, <b>Score</b> (S) it.</p>
+      <p><b>Scoring:</b> the heads/tails pattern sets base <span class="chip-word">Chips</span> × <span class="mult-word">Mult</span>, then each coin adds its own Chips/Mult, then your Charms pile on. Watch the live preview in the sidebar.</p>
+    </div>
+    <table class="tut-table">
+      <thead><tr><th>Pattern</th><th>How to get it</th><th>Chips × Mult</th></tr></thead>
+      <tbody id="tut-patterns"></tbody>
+    </table>
+    <div class="howto">
+      <p><b>The Mint</b> (shop, between rounds): buy <b>Charms</b> (passive modifiers, max 5), new <b>coins</b> (purse max 8), and <b>Omens</b> that permanently level up a pattern's base Chips and Mult.</p>
+      <p><b>The Crucible:</b> melt a coin to remove it from your purse for +$1 (once per shop, min 3 coins). A thinner purse hits all-Heads and all-Tails patterns far more often — fewer, better coins is a real strategy.</p>
+      <p><b>Money:</b> beating a Blind pays its reward, +$1 per unused Flip, and interest ($1 per $5 held, capped at $5).</p>
+    </div>
+    <button id="btn-tutorial-close" class="btn btn-gold">Got it</button>
   </div>
 </div>
 

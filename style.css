@@ -170,6 +170,34 @@ body {
 .shop-item .charm-name { padding-right: 30px; }
 .shop-actions { display: flex; justify-content: space-between; margin-top: 8px; }
 
+/* ----- Help button & tutorial ----- */
+#btn-help {
+  position: fixed; bottom: 16px; left: 16px; z-index: 9;
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--panel-2); color: var(--gold); font-size: 22px; font-weight: bold;
+  font-family: inherit; box-shadow: 0 4px 0 rgba(0,0,0,.35);
+  transition: transform .1s;
+}
+#btn-help:hover { transform: translateY(-2px); }
+#btn-help:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+.tutorial-box { max-width: 720px; }
+.tut-table { width: 100%; border-collapse: collapse; margin: 4px 0 16px; font-size: 13px; }
+.tut-table th { text-align: left; color: var(--dim); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; padding: 4px 8px; }
+.tut-table td { padding: 5px 8px; border-top: 1px solid rgba(255,255,255,.08); }
+.tut-table td:first-child { color: var(--gold); font-weight: bold; white-space: nowrap; }
+.tut-table td.num { text-align: right; white-space: nowrap; font-weight: bold; }
+.tut-table .lv { color: var(--blue); font-size: 11px; }
+.chip-word { color: var(--blue); font-weight: bold; }
+.mult-word { color: var(--red); font-weight: bold; }
+
+/* ----- Shop extras ----- */
+.shop-items { flex-wrap: wrap; }
+.omen-item .charm-name { color: var(--blue); }
+.melt-item .charm-name, .melt-pick .charm-name { color: #e67e22; }
+.melt-pick { flex: 0 1 180px; }
+.melt-pick:hover { box-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 0 2px #e67e22; }
+
 @media (max-width: 900px) {
   #game { flex-direction: column; overflow-y: auto; }
   body { overflow-y: auto; }
