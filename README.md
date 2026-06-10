@@ -21,3 +21,15 @@ Click the **?** button in the bottom-left (or press `?`) for the in-game tutoria
 ## Hotkeys
 
 `F` flip · `R` reroll selected · `S`/`Enter` score · `?` tutorial · `Esc` close tutorial
+
+## Development
+
+The code is split into `logic.js` (game state and rules, no DOM — also loads in Node) and `ui.js` (rendering, animation, input). Tests need Node 22+, no dependencies:
+
+```sh
+npm test               # unit + invariant tests (node --test)
+npm run balance        # balance simulation: 3 bot strategies × 1000 runs
+npm run balance:assert # the loose balance bounds CI enforces
+```
+
+`tests/` covers pattern classification, exact scoring math for every charm and boss, economy rules (payouts, interest, shop guards, melting), and randomized invariant soaks. `sim/balance.js` plays full runs with bot strategies (never-reroll, buy-everything, thin-purse) and reports win rates per ante — useful for tuning difficulty. CI runs all of it on every PR.

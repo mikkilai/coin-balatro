@@ -1,0 +1,11 @@
+{
+  "name": "flipjack",
+  "version": "1.0.0",
+  "description": "Balatro, but for coin flips. Browser game with no dependencies.",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "balance": "node sim/balance.js --runs 1000",
+    "balance:assert": "node sim/balance.js --runs 300 --assert"
+  }
+}
