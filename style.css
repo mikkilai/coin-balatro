@@ -58,7 +58,7 @@ body {
 .charm-slots { display: flex; gap: 10px; }
 .charm {
   width: 140px; min-height: 86px; background: var(--panel-2); border-radius: 10px; padding: 8px;
-  box-shadow: 0 4px 0 rgba(0,0,0,.3); flex-shrink: 0;
+  box-shadow: 0 4px 0 rgba(0,0,0,.3); flex-shrink: 0; position: relative;
 }
 .charm.empty { background: transparent; border: 2px dashed rgba(255,255,255,.12); box-shadow: none; }
 .charm-name { font-weight: bold; font-size: 13px; color: var(--gold); margin-bottom: 4px; }
@@ -170,16 +170,17 @@ body {
 .shop-item .charm-name { padding-right: 30px; }
 .shop-actions { display: flex; justify-content: space-between; margin-top: 8px; }
 
-/* ----- Help button & tutorial ----- */
-#btn-help {
+/* ----- Corner buttons & tutorial ----- */
+.corner-btn {
   position: fixed; bottom: 16px; left: 16px; z-index: 9;
   width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
   background: var(--panel-2); color: var(--gold); font-size: 22px; font-weight: bold;
   font-family: inherit; box-shadow: 0 4px 0 rgba(0,0,0,.35);
   transition: transform .1s;
 }
-#btn-help:hover { transform: translateY(-2px); }
-#btn-help:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.corner-btn:hover { transform: translateY(-2px); }
+.corner-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+#btn-mute { left: 70px; font-size: 18px; }
 
 .tutorial-box { max-width: 720px; }
 .tut-table { width: 100%; border-collapse: collapse; margin: 4px 0 16px; font-size: 13px; }
@@ -198,7 +199,47 @@ body {
 .melt-pick { flex: 0 1 180px; }
 .melt-pick:hover { box-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 0 2px #e67e22; }
 
+/* ----- Pouch selection & stats ----- */
+.pouch-cards { display: flex; gap: 12px; margin: 10px 0 16px; }
+.pouch {
+  flex: 1; background: var(--panel-2); border-radius: 10px; padding: 10px; cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0,0,0,.3); text-align: left; transition: transform .1s, box-shadow .1s;
+}
+.pouch:hover { transform: translateY(-3px); box-shadow: 0 7px 0 rgba(0,0,0,.3), 0 0 0 2px var(--gold); }
+.pouch-contents { font-size: 10px; color: var(--dim); margin-top: 6px; }
+.intro-stats { margin-top: 14px; font-size: 12px; color: var(--dim); }
+.end-stats { margin: 0 auto 18px; max-width: 340px; text-align: left; }
+.end-stat { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14px; }
+.end-stat span { color: var(--dim); }
+.end-stat b { color: var(--gold); }
+
+/* ----- Locked coins (boss) ----- */
+.coin.locked { cursor: not-allowed; }
+.coin.locked:hover { transform: none; }
+.coin-lock {
+  position: absolute; top: -8px; right: -4px; font-size: 16px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.5));
+}
+
+/* ----- Scoring animation ----- */
+@keyframes pulsepop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.pulsing { animation: pulsepop .3s ease-out; }
+.coin.pulsing { animation: pulsepop .3s ease-out; }
+.chip-pop {
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; font-size: 14px; font-weight: bold; white-space: nowrap;
+  pointer-events: none; animation: rise .7s ease-out forwards; z-index: 3;
+}
+.cp-chips { color: var(--blue); text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+.cp-mult { color: var(--red); text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+
 @media (max-width: 900px) {
+  .pouch-cards { flex-wrap: wrap; }
+  .pouch { flex: 1 1 45%; }
   #game { flex-direction: column; overflow-y: auto; }
   body { overflow-y: auto; }
   #sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; }

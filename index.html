@@ -83,7 +83,8 @@
   </div>
 </div>
 
-<button id="btn-help" title="How to play (?)">?</button>
+<button id="btn-help" class="corner-btn" title="How to play (?)">?</button>
+<button id="btn-mute" class="corner-btn" title="Toggle sound">🔊</button>
 
 <div id="tutorial" class="overlay hidden">
   <div class="overlay-box tutorial-box">
@@ -110,6 +111,7 @@
   <div class="overlay-box center">
     <h2 id="end-title">Game Over</h2>
     <p id="end-detail"></p>
+    <div id="end-stats" class="end-stats"></div>
     <button id="btn-restart" class="btn btn-gold">New Run</button>
   </div>
 </div>
@@ -123,7 +125,10 @@
       <p><b>Reroll</b> selected coins to chase better patterns, then <b>Score</b> the toss.</p>
       <p>Beat each Blind's score target before you run out of Flips. Spend winnings on <b>Charms</b> and new coins. Survive 8 Antes.</p>
     </div>
-    <button id="btn-start" class="btn btn-gold">Start Run</button>
+    <div class="row-label">Choose your pouch</div>
+    <div id="pouches" class="pouch-cards"></div>
+    <button id="btn-continue" class="btn btn-blue hidden">Continue Run</button>
+    <div id="intro-stats" class="intro-stats"></div>
   </div>
 </div>
 
